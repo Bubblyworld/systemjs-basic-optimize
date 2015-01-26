@@ -17,7 +17,7 @@ Outputs a list of bundle objects, which contain the modules in that bundle
   ...
  ]
 */
-function optimize(pages, _builder) {
+function optimize(pages, builder) {
   return getPageBundles(pages, builder)
     .then(function(bundles) { return extractCommon(bundles, builder); })
     .then(function(bundles) { return extractSharedDep(bundles, builder); });
@@ -32,10 +32,9 @@ function extractSharedDep(bundles, builder) {
   //run through bundles - if a bundle is shared by another, cut it into moduleCounts
   var moduleCounts = getModuleCounts(bundles);
   bundles.map(function(bundle) {
-    sharedDepBundle.routes = sharedDepBundle.routes.concat(bundle.routes);
-
     Object.keys(bundle.tree).map(function(module) {
       if (moduleCounts[module] > 1) {
+        sharedDepBundle.routes = sharedDepBundle.routes.concat(bundle.routes);
         sharedDepBundle.tree[module] = bundle.tree[module];
         delete bundle.tree[module];
       }
@@ -100,14 +99,14 @@ function getPageBundles(pages, builder) {
 
   return Object.keys(pages).reduce(function(chain, next) {
     return chain
-      .then(function() { getPageTree(pages[next], builder); })
+      .then(function() { return getPageTree(pages[next], builder); })
       .then(function(tree) {
         routeModules.push({
           routes: [next],
           tree: tree
         });
       });
-  })
+  }, Promise.resolve())
     .then(function() { return routeModules; });
 }
 
@@ -115,7 +114,7 @@ function getPageTree(modules, builder) {
   return Promise.all(modules.map(builder.trace.bind(builder)))
     .then(function(trees) {
       return trees.reduce(function(result, next) {
-        builder.addTrees(result, next.tree);
+        return builder.addTrees(result, next.tree);
       }, {});
     });
 }
