@@ -9,5 +9,10 @@ var pages = {
   'page3': ['lib/p3f1', 'lib/shared']
 };
 
-optimize(pages, builder)
-  .then(console.log.bind(console));
+//builder.trace('lib/p1f1').then(console.log.bind(console));
+Promise.all(Object.keys(pages).map(function(key) {
+  return Promise.all(pages[key].map(builder.trace.bind(builder)))
+    .then(function(trees) { pages[key] = trees; });
+}))
+  .then(function() { return optimize(pages); })
+  .then(console.log.bind(console))

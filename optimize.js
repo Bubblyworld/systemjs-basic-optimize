@@ -17,104 +17,47 @@ Outputs a list of bundle objects, which contain the modules in that bundle
   ...
  ]
 */
-function optimize(pages, builder) {
-  return getPageBundles(pages, builder)
-    .then(function(bundles) { return extractCommon(bundles, builder); })
-    .then(function(bundles) { return extractSharedDep(bundles, builder); });
-}
+function optimize(pages) {
+  var modules = {};
+  Object.keys(pages).map(function(key) {
+    pages[key].map(function(tree) {
+      if (!modules[tree.moduleName]) modules[tree.moduleName] = {
+        tree: tree.tree,
+        deps: []
+      };
 
-function extractSharedDep(bundles, builder) {
-  var sharedDepBundle = {
-    routes: [],
-    tree: {}
-  };
-
-  //run through bundles - if a bundle is shared by another, cut it into moduleCounts
-  var moduleCounts = getModuleCounts(bundles);
-  bundles.map(function(bundle) {
-    Object.keys(bundle.tree).map(function(module) {
-      if (moduleCounts[module] > 1) {
-        sharedDepBundle.routes = sharedDepBundle.routes.concat(bundle.routes);
-        sharedDepBundle.tree[module] = bundle.tree[module];
-        delete bundle.tree[module];
-      }
+      modules[tree.moduleName].deps.push(key);
     });
   });
 
-  sharedDepBundle.routes = removeDuplicates(sharedDepBundle.routes);
-  bundles.push(sharedDepBundle);
-  return bundles;
-}
+  var bundles = {};
+  Object.keys(modules).map(function(key) {
+    modules[key].deps = removeDuplicates(modules[key].deps);
 
-//Extract a bundle of modules common to each of the current bundles
-function extractCommon(bundles, builder) {
-  var commonBundle = {
-    routes: [],
-    tree: {}
-  };
+    var index = modules[key].deps.sort().join();
+    bundles[index] = bundles[index] || {
+      routes: modules[key].deps,
+      tree: {}
+    };
 
-  bundles.map(function(bundle) {
-    commonBundle.routes = commonBundle.routes.concat(bundle.routes);
-
-    if (Object.keys(commonBundle.tree).length === 0)
-      commonBundle.tree = bundle.tree;
-
-    commonBundle.tree = builder.intersectTrees(commonBundle.tree, bundle.tree);
+    bundles[index].tree = addTrees(bundles[index].tree, modules[key].tree);
   });
 
-  bundles.map(function(bundle) {
-    bundle.tree = builder.subtractTrees(bundle.tree, commonBundle.tree);
+  return Object.keys(bundles).map(function(key) { return bundles[key]; });
+}
+
+function addTrees(x, y) {
+  var result = {};
+
+  var i;
+  for (i in x) result[i] = x[i];
+  for (i in y) result[i] = y[i];
+
+  return result;
+}
+
+function removeDuplicates(xs) {
+  return xs.filter(function(x, i) {
+    return xs.indexOf(x) === i;
   });
-
-  commonBundle.routes = removeDuplicates(commonBundle.routes);
-  bundles.push(commonBundle);
-  return bundles;
-}
-
-//Counts the number of times each module occurs in the list of bundles.
-function getModuleCounts(bundles) {
-  var moduleCounts = {};
-  bundles.map(function(bundle) {
-    Object.keys(bundle.tree).map(function(module) {
-      if (!moduleCounts[module]) moduleCounts[module] = 0;
-      moduleCounts[module]++;
-    });
-  });
-
-  return moduleCounts;
-}
-
-//Remove duplicates in an array
-function removeDuplicates(array) {
-  return array.filter(function(x, i) {
-    return array.indexOf(x) === i;
-  });
-}
-
-//Given the dependencies keyed by page, returns a list of bundle objects
-// bundling all the dependencies for each route. We then transform this
-// extractCommon and extractShared to get the described output.
-function getPageBundles(pages, builder) {
-  var routeModules = [];
-
-  return Object.keys(pages).reduce(function(chain, next) {
-    return chain
-      .then(function() { return getPageTree(pages[next], builder); })
-      .then(function(tree) {
-        routeModules.push({
-          routes: [next],
-          tree: tree
-        });
-      });
-  }, Promise.resolve())
-    .then(function() { return routeModules; });
-}
-
-function getPageTree(modules, builder) {
-  return Promise.all(modules.map(builder.trace.bind(builder)))
-    .then(function(trees) {
-      return trees.reduce(function(result, next) {
-        return builder.addTrees(result, next.tree);
-      }, {});
-    });
 }
