@@ -1,6 +1,6 @@
 {
   "name": "systemjs-basic-optimize",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A basic three-layer bundle optimization function for the systemjs loader.",
   "main": "optimize.js",
   "repository": {
