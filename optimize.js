@@ -1,7 +1,7 @@
 module.exports = optimize;
 
 /*
-Takes a dependency object, consisting of module dependencies keyed
+Takes a dependency object, consisting of module dependencies' trace records keyed
  by page ID, for example:
 {
   'page1' : ['page1-module1', 'page1-module2', 'shared'],
@@ -20,13 +20,16 @@ Outputs a list of bundle objects, which contain the modules in that bundle
 function optimize(pages) {
   var modules = {};
   Object.keys(pages).map(function(key) {
-    pages[key].map(function(tree) {
-      if (!modules[tree.moduleName]) modules[tree.moduleName] = {
-        tree: tree.tree,
-        deps: []
-      };
+    pages[key].map(function(trace) {
+      Object.keys(trace.tree).map(function(moduleName) {
+        var record = trace.tree[moduleName];
+        if (!modules[moduleName]) modules[moduleName] = {
+          record: record,
+          deps: []
+        };
 
-      modules[tree.moduleName].deps.push(key);
+        modules[moduleName].deps.push(key);
+      });
     });
   });
 
@@ -40,20 +43,10 @@ function optimize(pages) {
       tree: {}
     };
 
-    bundles[index].tree = addTrees(bundles[index].tree, modules[key].tree);
+    bundles[index].tree[key] = modules[key].record;
   });
 
   return Object.keys(bundles).map(function(key) { return bundles[key]; });
-}
-
-function addTrees(x, y) {
-  var result = {};
-
-  var i;
-  for (i in x) result[i] = x[i];
-  for (i in y) result[i] = y[i];
-
-  return result;
 }
 
 function removeDuplicates(xs) {
